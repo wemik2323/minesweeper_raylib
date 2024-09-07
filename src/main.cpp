@@ -6,7 +6,12 @@
 // MINEFIELD VARS
 const int fieldHeight = 10;
 const int fieldWidth = 10;
-const int amountOfMines = 30;
+const int amountOfMines = 10;
+
+// GLOB BLOB
+int selectedColumn = -1;
+int selectedRow = -1;
+int boomCheck = 0;
 
 enum GameScene {
 	MENU,
@@ -34,6 +39,13 @@ class Cell {
     bool isExposed() { return exposed; }
 
     bool isTagged() { return tagged; }
+    void toggleTag() {
+        if (tagged) {
+            tagged = false;
+        } else {
+            tagged = true;
+        }
+    }
 
     bool isMined() { return mined; }
     void setMine() { mined = true; }
@@ -48,18 +60,17 @@ class Cell {
     void setSrcRect() {
         if (isExposed()) {
             if (isMined()) {
-                srcRect = {16 * 10, 16};
+                srcRect = {16 * 10, 0, 16, 16};
                 return;
             }
 
-            int texCol = minesAround - 1;
-            srcRect = {float(16 * texCol), 16};
+            srcRect = {float(16 * minesAround), 0, 16, 16};
         } else {
             if (isTagged()) {
-                srcRect = {16 * 11, 16};
+                srcRect = {16 * 11, 0, 16, 16};
                 return;
             } else {
-                srcRect = {16 * 9, 16};
+                srcRect = {16 * 9, 0, 16, 16};
                 return;
             }
         }
@@ -70,7 +81,9 @@ class MineField {
    public:
     std::vector<std::vector<Cell>> matrix;
 
-    MineField() {
+    MineField() { createField(); }
+
+    void createField() {
         matrix.resize(fieldWidth);
         for (int i = 0; i < fieldWidth; i++) {
             matrix[i].resize(fieldHeight);
@@ -105,6 +118,12 @@ class MineField {
                 }
             }
         }
+    }
+
+    void resetField() { 
+        matrix.clear();
+        createField();
+        initializeMineFiled();
         for (int i = 0; i < matrix.size(); i++) {
             for (int j = 0; j < matrix[i].size(); j++) {
                 matrix[i][j].setSrcRect();
@@ -112,9 +131,38 @@ class MineField {
         }
     }
 
+    int isFieldExposed() {
+        for (int i = 0; i < matrix.size(); i++) {
+            for (int j = 0; j < matrix[i].size(); j++) {
+                if (!matrix[i][j].isExposed()) {
+                    return 0;
+                }
+            }
+        }
+        return 1;
+    }
+
+    int openCell() {
+        matrix[selectedColumn][selectedRow].exposed = true;
+        std::cout << matrix[selectedColumn][selectedRow].minesAround << "\n";
+        if (matrix[selectedColumn][selectedRow].isMined()) {
+            for (int i = 0; i < matrix.size(); i++) {
+                for (int j = 0; j < matrix[i].size(); j++) {
+                    matrix[i][j].exposed = true;
+                }
+            }
+            return -1;
+        } else {
+            if (matrix[selectedColumn][selectedRow].minesAround == 0) {
+                //DOPISAT XYETY SUMHOW
+            }
+        }
+    }
+
     void drawMineFiled(Rectangle stage, Texture2D& asset, Vector2 size) {
         for (int i = 0; i < matrix.size(); i++) {
             for (int j = 0; j < matrix[i].size(); j++) {
+                matrix[i][j].setSrcRect();
                 matrix[i][j].drawCell(
                     asset, {stage.x + (i * size.x),
                             stage.y + stage.height / 6.0f +
@@ -124,6 +172,52 @@ class MineField {
     }
 };
 
+enum Emotions {
+    CAS,
+    SMILE,
+    DEAD
+};
+
+class TopPanel {
+   public:
+    Emotions face;
+
+    TopPanel() : face{CAS}{}
+
+    void drawPanel(Texture2D& casFace, Texture2D& smileFace, Texture2D& deadFace, Rectangle stage) {
+        switch (face) {
+            case CAS:
+                DrawTexturePro(
+                    casFace, {0, 0, 150, 150},
+                    {stage.x + stage.width / 2 - (stage.height * 4 / 36) / 2,
+                     stage.y + stage.height / 36, stage.height * 4 / 36,
+                     stage.height * 4 / 36},
+                    {0, 0}, 0.0f, WHITE);
+                break;
+            case SMILE:
+                DrawTexturePro(
+                    smileFace, {0, 0, 150, 150},
+                    {stage.x + stage.width / 2 - (stage.height * 4 / 36) / 2,
+                     stage.y + stage.height / 36, stage.height * 4 / 36,
+                     stage.height * 4 / 36},
+                    {0, 0}, 0.0f, WHITE);
+                break;
+            case DEAD:
+                DrawTexturePro(
+                    deadFace, {0, 0, 150, 150},
+                    {stage.x + stage.width / 2 - (stage.height * 4 / 36) / 2,
+                     stage.y + stage.height / 36, stage.height * 4 / 36,
+                     stage.height * 4 / 36},
+                    {0, 0}, 0.0f, WHITE);
+                break;
+            default:
+                break;
+        }
+    }
+};
+
+int CheckPannelInput(Rectangle stage, MineField& minefield, TopPanel& panel);
+void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, TopPanel& panel);
 
 int main() {
     int width = 500;
@@ -135,11 +229,28 @@ int main() {
 
     Texture2D asset = LoadTextureFromImage(LoadImage("../resources/asset.png"));
 
+    Texture2D casFace = LoadTextureFromImage(LoadImage("../resources/casFace.png"));
+    Texture2D smileFace =
+        LoadTextureFromImage(LoadImage("../resources/smileFace.png"));
+    Texture2D deadFace =
+        LoadTextureFromImage(LoadImage("../resources/deadFace.png"));
+    Texture2D bg_win =
+        LoadTextureFromImage(LoadImage("../resources/bg_texture_win.png"));
+    Texture2D bg_loss =
+        LoadTextureFromImage(LoadImage("../resources/bg_texture_loss.png"));
+
+
+
     GameScene currentScene = MENU;
 
-    while (!WindowShouldClose()) {
+    Rectangle stage;
 
-        Rectangle stage;
+    MineField mineField;
+    mineField.initializeMineFiled();
+
+    TopPanel panel;
+
+    while (!WindowShouldClose()) {
         width = GetScreenWidth();
         height = GetScreenHeight();
         if (height < float(width) / 5.0f * 6.0f) {
@@ -153,9 +264,6 @@ int main() {
         stage.y = GetScreenHeight() / 2.0 - stage.height / 2.0;
         Vector2 cellSize {stage.width / float(fieldWidth),
                          5.0f / 6.0f * stage.height / fieldHeight};
-
-        MineField mineField;
-        mineField.initializeMineFiled();
 
         switch (currentScene) {
             case MENU:
@@ -179,8 +287,21 @@ int main() {
                                     stage.height, LIGHTGRAY);
                 }
 
-                DrawTexture(asset, stage.x, stage.y, WHITE);
+                CheckPannelInput(stage, mineField, panel);
+                CheckMouseInput(cellSize, stage, mineField, panel);
+
                 mineField.drawMineFiled(stage, asset, cellSize);
+                panel.drawPanel(casFace, smileFace, deadFace, stage);
+                
+                if (boomCheck == -1) {
+                    panel.face = DEAD;
+                    currentScene = LOSS;
+                }
+                if (boomCheck != -1 and mineField.isFieldExposed() == 1) {
+                    panel.face = CAS;
+                    currentScene = WIN;
+                }
+                currentScene = WIN;
 
                 EndDrawing();
                 break;
@@ -188,11 +309,44 @@ int main() {
                 BeginDrawing();
                 ClearBackground(RAYWHITE);
 
+                if (IsKeyDown(KEY_SPACE)) {
+                    DrawRectangle(stage.x, stage.y, stage.width, stage.height,
+                                  LIGHTGRAY);
+                }
+
+                if (CheckPannelInput(stage, mineField, panel) == 1) {
+                    currentScene = GAME;
+                }
+                DrawTexturePro(bg_win, {0, 0, 2560, 1920},
+                               {stage.x, stage.y + stage.height / 6.0f,
+                                stage.width, stage.height * 5.0f / 6.0f},
+                               {0, 0}, 0.0f, WHITE);
+                // mineField.drawMineFiled(stage, asset, cellSize);
+                panel.drawPanel(casFace, smileFace, deadFace, stage);
+
                 EndDrawing();
                 break;
             case LOSS:
                 BeginDrawing();
                 ClearBackground(RAYWHITE);
+
+                if (IsKeyDown(KEY_SPACE)) {
+                    DrawRectangle(stage.x, stage.y, stage.width, stage.height,
+                                  LIGHTGRAY);
+                }
+
+                if (CheckPannelInput(stage, mineField, panel) == 1) {
+                    currentScene = GAME;
+                    boomCheck = 0;
+                }
+                CheckMouseInput(cellSize, stage, mineField, panel);
+
+                DrawTexturePro(bg_loss, {0, 0, 1620, 2160},
+                               {stage.x, stage.y + stage.height / 6.0f,
+                                stage.width, stage.height * 5.0f / 6.0f},
+                               {0, 0}, 0.0f, WHITE);
+                //mineField.drawMineFiled(stage, asset, cellSize);
+                panel.drawPanel(casFace,smileFace,deadFace,stage);
 
                 EndDrawing();
                 break;
@@ -202,5 +356,78 @@ int main() {
         }
     }
 
+    UnloadTexture(asset);
+    UnloadTexture(casFace);
+    UnloadTexture(smileFace);
+    UnloadTexture(deadFace);
+
     return 0;
+}
+
+int CheckPannelInput(Rectangle stage, MineField& minefield, TopPanel& panel) {
+    Vector2 mousePos = GetMousePosition();
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(
+                mousePos,
+                {stage.x + stage.width / 2 - (stage.height * 4 / 36) / 2,
+                 stage.y + stage.height / 36, stage.height * 4 / 36,
+                 stage.height * 4 / 36})) {
+            minefield.resetField();
+            panel.face = CAS;
+            boomCheck = 0;
+            return 1;
+        }
+    }
+}
+
+void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, TopPanel& panel) {
+    Vector2 mousePos = GetMousePosition();
+
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+
+        for (int i = 0; i < minefield.matrix.size(); i++) {
+            for (int j = 0; j < minefield.matrix[i].size(); j++) {
+                if (minefield.matrix[i][j].isExposed() or
+                    minefield.matrix[i][j].isTagged()) {
+                    continue;
+                }
+                Rectangle cellRect{
+                    stage.x + (i * cellSize.x),
+                    stage.y + stage.height / 6.0f + (j * cellSize.y), cellSize.x, cellSize.y};
+                if (CheckCollisionPointRec(mousePos, cellRect)) {
+                    selectedColumn = i;
+                    selectedRow = j;
+                    return;
+                }
+            }
+        }
+    } 
+    if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+        for (int i = 0; i < minefield.matrix.size(); i++) {
+            for (int j = 0; j < minefield.matrix[i].size(); j++) {
+                Rectangle cellRect{stage.x + (i * cellSize.x),
+                            stage.y + stage.height / 6.0f +
+                                (j * cellSize.y), cellSize.x, cellSize.y};
+                if (CheckCollisionPointRec(mousePos, cellRect)) {
+                    minefield.matrix[i][j].toggleTag();
+                    return;
+                }
+            }
+        }
+    }
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) and selectedColumn != -1 and selectedRow != -1) {
+            panel.face = SMILE;
+    }
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) and selectedColumn != -1 and selectedRow != -1) {       
+        Rectangle cellRect{stage.x + (selectedColumn * cellSize.x),
+                           stage.y + stage.height / 6.0f + (selectedRow * cellSize.y),
+                           cellSize.x, cellSize.y};
+        if (CheckCollisionPointRec(mousePos, cellRect)) {
+            boomCheck = minefield.openCell();
+        }
+
+        selectedColumn = -1;
+        selectedRow = -1;
+        panel.face = CAS;
+    }
 }
