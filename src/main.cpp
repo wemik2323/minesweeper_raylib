@@ -254,18 +254,17 @@ int main() {
     SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetTargetFPS(60);
 
-    Texture2D asset = LoadTextureFromImage(LoadImage("../resources/asset.png"));
+    Texture2D asset = LoadTexture("../resources/asset.png");
 
-    Texture2D casFace = LoadTextureFromImage(LoadImage("../resources/casFace.png"));
+    Texture2D casFace = LoadTexture("../resources/casFace.png");
     Texture2D smileFace =
-        LoadTextureFromImage(LoadImage("../resources/smileFace.png"));
+        LoadTexture("../resources/smileFace.png");
     Texture2D deadFace =
-        LoadTextureFromImage(LoadImage("../resources/deadFace.png"));
+        LoadTexture("../resources/deadFace.png");
     Texture2D bg_win =
-        LoadTextureFromImage(LoadImage("../resources/bg_texture_win.png"));
+        LoadTexture("../resources/bg_texture_win.png");
     Texture2D bg_loss =
-        LoadTextureFromImage(LoadImage("../resources/bg_texture_loss.png"));
-
+        LoadTexture("../resources/bg_texture_loss.png");
 
 
     GameScene currentScene = GAME;
@@ -407,6 +406,8 @@ int main() {
     UnloadTexture(casFace);
     UnloadTexture(smileFace);
     UnloadTexture(deadFace);
+    UnloadTexture(bg_loss);
+    UnloadTexture(bg_win);
 
     return 0;
 }
