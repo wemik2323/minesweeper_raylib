@@ -1,7 +1,6 @@
 #include <iostream>
 #include "raylib.h"
 #include <vector>
-#include <print>
 
 // MINEFIELD VARS
 const int fieldHeight = 10;
@@ -25,13 +24,13 @@ class Cell {
     bool exposed;
     bool tagged;
     bool mined;
+    bool dfsCheck;
     int minesAround;
     Rectangle srcRect;
 
     Cell()
         : exposed{false},
-          tagged{false},
-          mined{false},
+          tagged{false}, mined{false}, dfsCheck {false},
           minesAround{0},
         srcRect{0, 0, 0, 0}{}
    
@@ -86,10 +85,9 @@ class MineField {
     void createField() {
         matrix.resize(fieldWidth);
         for (int i = 0; i < fieldWidth; i++) {
-            matrix[i].resize(fieldHeight);
             for (int j = 0; j < fieldHeight; j++) {
                 Cell newCell;
-                matrix[i].push_back(newCell);
+                matrix[i].emplace_back(newCell);
             }
         }
     }
@@ -124,16 +122,19 @@ class MineField {
         matrix.clear();
         createField();
         initializeMineFiled();
-        for (int i = 0; i < matrix.size(); i++) {
-            for (int j = 0; j < matrix[i].size(); j++) {
+        for (int i = 0; i < fieldWidth; i++) {
+            for (int j = 0; j < fieldHeight; j++) {
                 matrix[i][j].setSrcRect();
             }
         }
     }
 
     int isFieldExposed() {
-        for (int i = 0; i < matrix.size(); i++) {
-            for (int j = 0; j < matrix[i].size(); j++) {
+        for (int i = 0; i < fieldWidth; i++) {
+            for (int j = 0; j < fieldHeight; j++) {
+                if (matrix[i][j].isMined()) {
+                    continue;
+                }
                 if (!matrix[i][j].isExposed()) {
                     return 0;
                 }
@@ -142,26 +143,52 @@ class MineField {
         return 1;
     }
 
+    void openAdjacentCells(int col, int row) {
+        matrix[col][row].exposed = true;
+        matrix[col][row].dfsCheck = true;
+
+        if (matrix[col][row].minesAround > 0) {
+            return;
+        } 
+
+        for (int i = -1; i <= 1; i++) {
+            for (int j = -1; j <= 1; j++) {
+                int dx = col + i;
+                int dy = row + j;
+                if (i == 0 and j == 0) {
+                    continue;
+                }
+                if ((dx < 0 or dy < 0) or  (dx >= fieldWidth or dy >= fieldHeight)) {
+                    continue;
+                }
+                if (!matrix[dx][dy].dfsCheck) {
+                    openAdjacentCells(dx, dy);
+                }
+            }
+        }
+    }
+
+
     int openCell() {
         matrix[selectedColumn][selectedRow].exposed = true;
-        std::cout << matrix[selectedColumn][selectedRow].minesAround << "\n";
         if (matrix[selectedColumn][selectedRow].isMined()) {
-            for (int i = 0; i < matrix.size(); i++) {
-                for (int j = 0; j < matrix[i].size(); j++) {
+            for (int i = 0; i < fieldWidth; i++) {
+                for (int j = 0; j < fieldHeight; j++) {
                     matrix[i][j].exposed = true;
                 }
             }
             return -1;
         } else {
             if (matrix[selectedColumn][selectedRow].minesAround == 0) {
-                //DOPISAT XYETY SUMHOW
+                openAdjacentCells(selectedColumn, selectedRow);
             }
+            return 0;
         }
     }
 
     void drawMineFiled(Rectangle stage, Texture2D& asset, Vector2 size) {
-        for (int i = 0; i < matrix.size(); i++) {
-            for (int j = 0; j < matrix[i].size(); j++) {
+        for (int i = 0; i < fieldWidth; i++) {
+            for (int j = 0; j < fieldHeight; j++) {
                 matrix[i][j].setSrcRect();
                 matrix[i][j].drawCell(
                     asset, {stage.x + (i * size.x),
@@ -241,7 +268,7 @@ int main() {
 
 
 
-    GameScene currentScene = MENU;
+    GameScene currentScene = GAME;
 
     Rectangle stage;
 
@@ -296,12 +323,21 @@ int main() {
                 if (boomCheck == -1) {
                     panel.face = DEAD;
                     currentScene = LOSS;
-                }
-                if (boomCheck != -1 and mineField.isFieldExposed() == 1) {
+                } else if (mineField.isFieldExposed() == 1) {
                     panel.face = CAS;
                     currentScene = WIN;
                 }
-                currentScene = WIN;
+
+                if (IsKeyPressed(KEY_F)) {
+                    for (int i = 0; i < fieldWidth; i++) {
+                        for (int j = 0; j < fieldHeight; j++) {
+                            std::cout << i << " " << j << " "
+                                      << mineField.matrix[i][j].isMined() << " "
+                                      << mineField.matrix[i][j].isExposed()
+                                      << '\n';
+                        }
+                    }
+                }
 
                 EndDrawing();
                 break;
@@ -317,11 +353,22 @@ int main() {
                 if (CheckPannelInput(stage, mineField, panel) == 1) {
                     currentScene = GAME;
                 }
+
+                if (IsKeyPressed(KEY_F)) {
+                    for (int i = 0; i < fieldWidth; i++) {
+                        for (int j = 0; j < fieldHeight; j++) {
+                            std::cout << i << " " << j << " "
+                                      << mineField.matrix[i][j].isMined() << " "
+                                      << mineField.matrix[i][j].isExposed()
+                                      << '\n';
+                        }
+                    }
+                }
+
                 DrawTexturePro(bg_win, {0, 0, 2560, 1920},
                                {stage.x, stage.y + stage.height / 6.0f,
                                 stage.width, stage.height * 5.0f / 6.0f},
                                {0, 0}, 0.0f, WHITE);
-                // mineField.drawMineFiled(stage, asset, cellSize);
                 panel.drawPanel(casFace, smileFace, deadFace, stage);
 
                 EndDrawing();
@@ -378,6 +425,7 @@ int CheckPannelInput(Rectangle stage, MineField& minefield, TopPanel& panel) {
             return 1;
         }
     }
+    return -1;
 }
 
 void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, TopPanel& panel) {
@@ -385,8 +433,8 @@ void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, To
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
 
-        for (int i = 0; i < minefield.matrix.size(); i++) {
-            for (int j = 0; j < minefield.matrix[i].size(); j++) {
+        for (int i = 0; i < fieldWidth; i++) {
+            for (int j = 0; j < fieldHeight; j++) {
                 if (minefield.matrix[i][j].isExposed() or
                     minefield.matrix[i][j].isTagged()) {
                     continue;
@@ -403,8 +451,8 @@ void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, To
         }
     } 
     if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
-        for (int i = 0; i < minefield.matrix.size(); i++) {
-            for (int j = 0; j < minefield.matrix[i].size(); j++) {
+        for (int i = 0; i < fieldWidth; i++) {
+            for (int j = 0; j < fieldHeight; j++) {
                 Rectangle cellRect{stage.x + (i * cellSize.x),
                             stage.y + stage.height / 6.0f +
                                 (j * cellSize.y), cellSize.x, cellSize.y};
