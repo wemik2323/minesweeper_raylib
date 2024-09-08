@@ -12,12 +12,7 @@ int selectedColumn = -1;
 int selectedRow = -1;
 int boomCheck = 0;
 
-enum GameScene {
-	MENU,
-	GAME,
-	WIN,
-	LOSS
-};
+enum GameScene { MENU, GAME, WIN, LOSS };
 
 class Cell {
    public:
@@ -30,10 +25,11 @@ class Cell {
 
     Cell()
         : exposed{false},
-          tagged{false}, mined{false}, dfsCheck {false},
+          tagged{false},
+          mined{false},
+          dfsCheck{false},
           minesAround{0},
-        srcRect{0, 0, 0, 0}{}
-   
+          srcRect{0, 0, 0, 0} {}
 
     bool isExposed() { return exposed; }
 
@@ -48,12 +44,12 @@ class Cell {
 
     bool isMined() { return mined; }
     void setMine() { mined = true; }
-    
+
     void plusMineAround() { minesAround++; }
 
     void drawCell(Texture2D& asset, Vector2 position, Vector2 size) {
-        DrawTexturePro(asset, srcRect,
-                       {position.x, position.y, size.x, size.y}, { 0, 0}, 0.0f, WHITE);
+        DrawTexturePro(asset, srcRect, {position.x, position.y, size.x, size.y},
+                       {0, 0}, 0.0f, WHITE);
     }
 
     void setSrcRect() {
@@ -118,7 +114,7 @@ class MineField {
         }
     }
 
-    void resetField() { 
+    void resetField() {
         matrix.clear();
         createField();
         initializeMineFiled();
@@ -149,7 +145,7 @@ class MineField {
 
         if (matrix[col][row].minesAround > 0) {
             return;
-        } 
+        }
 
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
@@ -158,7 +154,8 @@ class MineField {
                 if (i == 0 and j == 0) {
                     continue;
                 }
-                if ((dx < 0 or dy < 0) or  (dx >= fieldWidth or dy >= fieldHeight)) {
+                if ((dx < 0 or dy < 0) or
+                    (dx >= fieldWidth or dy >= fieldHeight)) {
                     continue;
                 }
                 if (!matrix[dx][dy].dfsCheck) {
@@ -167,7 +164,6 @@ class MineField {
             }
         }
     }
-
 
     int openCell() {
         matrix[selectedColumn][selectedRow].exposed = true;
@@ -191,27 +187,25 @@ class MineField {
             for (int j = 0; j < fieldHeight; j++) {
                 matrix[i][j].setSrcRect();
                 matrix[i][j].drawCell(
-                    asset, {stage.x + (i * size.x),
-                            stage.y + stage.height / 6.0f +
-                                (j * size.y)}, size);
+                    asset,
+                    {stage.x + (i * size.x),
+                     stage.y + stage.height / 6.0f + (j * size.y)},
+                    size);
             }
         }
     }
 };
 
-enum Emotions {
-    CAS,
-    SMILE,
-    DEAD
-};
+enum Emotions { CAS, SMILE, DEAD };
 
 class TopPanel {
    public:
     Emotions face;
 
-    TopPanel() : face{CAS}{}
+    TopPanel() : face{CAS} {}
 
-    void drawPanel(Texture2D& casFace, Texture2D& smileFace, Texture2D& deadFace, Rectangle stage) {
+    void drawPanel(Texture2D& casFace, Texture2D& smileFace,
+                   Texture2D& deadFace, Rectangle stage) {
         switch (face) {
             case CAS:
                 DrawTexturePro(
@@ -244,28 +238,36 @@ class TopPanel {
 };
 
 int CheckPannelInput(Rectangle stage, MineField& minefield, TopPanel& panel);
-void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, TopPanel& panel);
+void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield,
+                     TopPanel& panel);
 
 int main() {
     int width = 500;
     int height = 600;
 
+    // ANIMATION TRYING
+    const float frequency = 0.5f;
+
+    float rectStartSize = 10.0f;
+    float rectMaxSize = 2000.0f;
+
+    float rectSpeed = 200.0f;
+
+    float rectSize = rectStartSize;
+    Vector2 rectPosition = {height / 2, width / 2};
+    // LOL
+
     InitWindow(width, height, "MINEKOKER");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetTargetFPS(60);
 
-    Texture2D asset = LoadTexture("../resources/asset.png");
+    Texture2D asset = LoadTexture("resources/asset.png");
 
-    Texture2D casFace = LoadTexture("../resources/casFace.png");
-    Texture2D smileFace =
-        LoadTexture("../resources/smileFace.png");
-    Texture2D deadFace =
-        LoadTexture("../resources/deadFace.png");
-    Texture2D bg_win =
-        LoadTexture("../resources/bg_texture_win.png");
-    Texture2D bg_loss =
-        LoadTexture("../resources/bg_texture_loss.png");
-
+    Texture2D casFace = LoadTexture("resources/casFace.png");
+    Texture2D smileFace = LoadTexture("resources/smileFace.png");
+    Texture2D deadFace = LoadTexture("resources/deadFace.png");
+    Texture2D bg_win = LoadTexture("resources/bg_texture_win.png");
+    Texture2D bg_loss = LoadTexture("resources/bg_texture_loss.png");
 
     GameScene currentScene = GAME;
 
@@ -288,29 +290,47 @@ int main() {
         }
         stage.x = GetScreenWidth() / 2.0 - stage.width / 2.0;
         stage.y = GetScreenHeight() / 2.0 - stage.height / 2.0;
-        Vector2 cellSize {stage.width / float(fieldWidth),
+        Vector2 cellSize{stage.width / float(fieldWidth),
                          5.0f / 6.0f * stage.height / fieldHeight};
+
+        // ANIMATED
+        float time = GetTime();
+        float intensity =
+            (std::sin(time * frequency) + 1.0f) / 2.0f * 0.8f + 0.2f;
+        Color bgColor = {static_cast<unsigned char>(intensity * 255), 0, 255,
+                         255};
+
+        rectSize += rectSpeed * GetFrameTime();
+        if (rectSize > rectMaxSize) {
+            rectSize = rectStartSize;
+        }
+
+        DrawRectangleLinesEx(
+            {stage.x + stage.width / 2 - rectSize / 2,
+             stage.y + stage.height / 2 - rectSize / 2, rectSize, rectSize},
+            5, WHITE);
+        // ANIMATED
 
         switch (currentScene) {
             case MENU:
                 BeginDrawing();
-                ClearBackground(RAYWHITE);
+                ClearBackground(bgColor);
 
                 if (IsKeyPressed(KEY_ENTER)) {
                     currentScene = GAME;
                 }
 
                 DrawText("PRESS ENTERINO", stage.x + stage.width / 4,
-                            stage.y + stage.height / 4, 40, RED);
+                         stage.y + stage.height / 4, 40, RED);
                 EndDrawing();
                 break;
             case GAME:
                 BeginDrawing();
-                ClearBackground(RAYWHITE);
+                ClearBackground(bgColor);
 
                 if (IsKeyDown(KEY_SPACE)) {
-                    DrawRectangle(stage.x, stage.y, stage.width,
-                                    stage.height, LIGHTGRAY);
+                    DrawRectangle(stage.x, stage.y, stage.width, stage.height,
+                                  LIGHTGRAY);
                 }
 
                 CheckPannelInput(stage, mineField, panel);
@@ -318,7 +338,7 @@ int main() {
 
                 mineField.drawMineFiled(stage, asset, cellSize);
                 panel.drawPanel(casFace, smileFace, deadFace, stage);
-                
+
                 if (boomCheck == -1) {
                     panel.face = DEAD;
                     currentScene = LOSS;
@@ -342,7 +362,7 @@ int main() {
                 break;
             case WIN:
                 BeginDrawing();
-                ClearBackground(RAYWHITE);
+                ClearBackground(bgColor);
 
                 if (IsKeyDown(KEY_SPACE)) {
                     DrawRectangle(stage.x, stage.y, stage.width, stage.height,
@@ -374,7 +394,7 @@ int main() {
                 break;
             case LOSS:
                 BeginDrawing();
-                ClearBackground(RAYWHITE);
+                ClearBackground(bgColor);
 
                 if (IsKeyDown(KEY_SPACE)) {
                     DrawRectangle(stage.x, stage.y, stage.width, stage.height,
@@ -391,8 +411,7 @@ int main() {
                                {stage.x, stage.y + stage.height / 6.0f,
                                 stage.width, stage.height * 5.0f / 6.0f},
                                {0, 0}, 0.0f, WHITE);
-                //mineField.drawMineFiled(stage, asset, cellSize);
-                panel.drawPanel(casFace,smileFace,deadFace,stage);
+                panel.drawPanel(casFace, smileFace, deadFace, stage);
 
                 EndDrawing();
                 break;
@@ -429,11 +448,11 @@ int CheckPannelInput(Rectangle stage, MineField& minefield, TopPanel& panel) {
     return -1;
 }
 
-void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, TopPanel& panel) {
+void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield,
+                     TopPanel& panel) {
     Vector2 mousePos = GetMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-
         for (int i = 0; i < fieldWidth; i++) {
             for (int j = 0; j < fieldHeight; j++) {
                 if (minefield.matrix[i][j].isExposed() or
@@ -442,7 +461,8 @@ void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, To
                 }
                 Rectangle cellRect{
                     stage.x + (i * cellSize.x),
-                    stage.y + stage.height / 6.0f + (j * cellSize.y), cellSize.x, cellSize.y};
+                    stage.y + stage.height / 6.0f + (j * cellSize.y),
+                    cellSize.x, cellSize.y};
                 if (CheckCollisionPointRec(mousePos, cellRect)) {
                     selectedColumn = i;
                     selectedRow = j;
@@ -450,13 +470,14 @@ void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, To
                 }
             }
         }
-    } 
+    }
     if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
         for (int i = 0; i < fieldWidth; i++) {
             for (int j = 0; j < fieldHeight; j++) {
-                Rectangle cellRect{stage.x + (i * cellSize.x),
-                            stage.y + stage.height / 6.0f +
-                                (j * cellSize.y), cellSize.x, cellSize.y};
+                Rectangle cellRect{
+                    stage.x + (i * cellSize.x),
+                    stage.y + stage.height / 6.0f + (j * cellSize.y),
+                    cellSize.x, cellSize.y};
                 if (CheckCollisionPointRec(mousePos, cellRect)) {
                     minefield.matrix[i][j].toggleTag();
                     return;
@@ -464,13 +485,16 @@ void CheckMouseInput(Vector2 cellSize, Rectangle stage, MineField& minefield, To
             }
         }
     }
-    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) and selectedColumn != -1 and selectedRow != -1) {
-            panel.face = SMILE;
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) and selectedColumn != -1 and
+        selectedRow != -1) {
+        panel.face = SMILE;
     }
-    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) and selectedColumn != -1 and selectedRow != -1) {       
-        Rectangle cellRect{stage.x + (selectedColumn * cellSize.x),
-                           stage.y + stage.height / 6.0f + (selectedRow * cellSize.y),
-                           cellSize.x, cellSize.y};
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) and selectedColumn != -1 and
+        selectedRow != -1) {
+        Rectangle cellRect{
+            stage.x + (selectedColumn * cellSize.x),
+            stage.y + stage.height / 6.0f + (selectedRow * cellSize.y),
+            cellSize.x, cellSize.y};
         if (CheckCollisionPointRec(mousePos, cellRect)) {
             boomCheck = minefield.openCell();
         }
